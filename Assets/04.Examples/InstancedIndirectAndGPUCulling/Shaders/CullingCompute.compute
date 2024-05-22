@@ -1,0 +1,78 @@
+#pragma kernel CSCullingMain
+
+float4x4 _vpMatrix;
+float4 _camPositionWS;
+float4 _boundExtend;
+float _maxDistance;
+uint _maxCount;
+
+RWStructuredBuffer<float4> _worldPosition;
+AppendStructuredBuffer<uint> _visibleID;
+
+
+uint IsInFrustum(float3 worldPos)
+{
+    float4 clipPos = mul(_vpMatrix, float4(worldPos, 1));
+    
+    float w = clipPos.w;
+    if( clipPos.x > w || clipPos.x < -w ||
+        clipPos.y > w || clipPos.y < -w ||
+        clipPos.z > w )
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
+}
+
+[numthreads(64,1,1)]
+void CSCullingMain (uint3 dipatchId : SV_DispatchThreadID)
+{
+    uint id = dipatchId.x;
+    if(id > _maxCount - 1)
+    {
+        return;
+    }
+    
+    uint inRange = 0;
+    if( distance(_camPositionWS.xyz, _worldPosition[id].xyz) < _maxDistance )
+    {
+        inRange = 1;
+    }
+
+    float3 worldPos = _worldPosition[id].xyz;
+
+    //float4 clipPos = mul(_vpMatrix, float4(worldPos, 1));
+
+    float2 boundMin = float2(worldPos.xy - _boundExtend.xy);
+    float2 boundMax = float2(worldPos.xy + _boundExtend.xy);
+
+    float3 pos[8];
+    pos[0] = float3(boundMin.x, boundMin.y, worldPos.z);
+    pos[1] = float3(boundMax.x, boundMax.y, worldPos.z);
+    pos[2] = float3(boundMin.x, boundMax.y, worldPos.z);
+    pos[3] = float3(boundMax.x, boundMin.y, worldPos.z);
+
+    pos[4] = float3(boundMin.x, boundMin.y, worldPos.z + _boundExtend.z);
+    pos[5] = float3(boundMax.x, boundMax.y, worldPos.z + _boundExtend.z);
+    pos[6] = float3(boundMin.x, boundMax.y, worldPos.z + _boundExtend.z);
+    pos[7] = float3(boundMax.x, boundMin.y, worldPos.z + _boundExtend.z);
+    
+
+    uint inFrustum = 0;
+
+	for(int i = 0; i< 8;i++) 
+	{
+		float3 p = pos[i];
+        inFrustum += IsInFrustum(p);
+	}
+    
+    uint visible = min(inRange, saturate(inFrustum));
+    
+    if(visible > 0)
+    {
+        _visibleID.Append(id.x);
+    }
+}
