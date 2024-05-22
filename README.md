@@ -5,6 +5,8 @@
 >Compute shader視錐剃除
 >
 >模擬草的搖擺、風及玩家可踩踏
+>
+>草擷取terrain顏色
 
 ### 2.體積光 ( Assets/01.Scenes/VolumetricScene )
 >基於後處理的體積光，採逕向模糊方法
